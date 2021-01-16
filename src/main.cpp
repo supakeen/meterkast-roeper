@@ -1,4 +1,4 @@
-#include <WiFi.h>
+#include <ESP8266WiFi.h>
 #include <MQTT.h>
 #include <SoftwareSerial.h>
 
@@ -67,6 +67,7 @@ void loop_p1_reader() {
     P1R.loop();
 
     if(now - last_telegram > 15000 || first_telegram) {
+        Serial.println("Reading a new telegram.");
         P1R.enable(true);
         last_telegram = now;
     }
@@ -85,7 +86,6 @@ void loop_p1_reader() {
 
 void setup() {
     Serial.begin(115200);
-    Serial.println("Boot");
 
     setup_wifi();
     setup_mqtt();
@@ -96,7 +96,6 @@ void setup() {
 void loop() {
     loop_wifi();
     loop_mqtt();
-
     loop_p1_reader();
 }
 
