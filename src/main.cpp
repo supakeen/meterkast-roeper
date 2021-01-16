@@ -13,7 +13,7 @@ MQTTClient mqtt;
 WiFiClient wificlient;
 
 SoftwareSerial P1S;
-P1Reader P1R;
+P1Reader P1R(&P1S, 2);
 
 struct Printer {
   template<typename Item>
@@ -55,7 +55,6 @@ void setup_software_serial() {
 }
 
 void setup_p1_reader() {
-    P1R = P1Reader(&P1S, 2);
     P1R.enable(true);
 }
 
@@ -86,6 +85,7 @@ void loop_p1_reader() {
 
 void setup() {
     Serial.begin(115200);
+    Serial.println("Boot");
 
     setup_wifi();
     setup_mqtt();
