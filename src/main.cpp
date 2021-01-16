@@ -1,110 +1,103 @@
-#include <ESP8266WiFi.h>
-#include <PubSubClient.h>
+#include <WiFi.h>
+#include <MQTT.h>
 #include <SoftwareSerial.h>
 
-void callback(char*, byte*, unsigned int);
-void reconnect();
+#include <dsmr.h>
 
-IPAddress mqttServer(192, 168, 1, 10);
-WiFiClient wifiClient = WiFiClient();
-PubSubClient mqttClient(mqttServer, 1883, callback, wifiClient);
+#include "setting.h"
 
-SoftwareSerial software_serial(D1, -1, true);
+#define RTS_PIN D3
+#define RX_PIN RX
+
+MQTTClient mqtt;
+WiFiClient wificlient;
+
+SoftwareSerial P1S;
+P1Reader P1R;
+
+struct Printer {
+  template<typename Item>
+  void apply(Item &i) {
+    if (i.present()) {
+      Serial.print(Item::name);
+      Serial.print(F(": "));
+      Serial.print(i.val());
+      Serial.print(Item::unit());
+      Serial.println();
+    }
+  }
+};
+
+void setup_wifi() {
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+    while(WiFi.status() != WL_CONNECTED) delay(500);
+}
+
+void loop_wifi() {
+}
+
+void setup_mqtt() {
+    static WiFiClient wificlient;
+
+    mqtt.begin("192.168.1.10", 1883, wificlient);
+
+    while(!mqtt.connect("")) delay(500);
+}
+
+void loop_mqtt() {
+    mqtt.loop();
+}
+
+void setup_software_serial() {
+    P1S.begin(115200, SWSERIAL_8N1, RX_PIN, -1, true, 1024);
+    P1S.setTimeout(50);
+}
+
+void setup_p1_reader() {
+    P1R = P1Reader(&P1S, 2);
+    P1R.enable(true);
+}
+
+void loop_p1_reader() {
+    static unsigned long last_telegram;
+    static bool first_telegram;
+
+    unsigned long now = millis();
+
+    P1R.loop();
+
+    if(now - last_telegram > 15000 || first_telegram) {
+        P1R.enable(true);
+        last_telegram = now;
+    }
+
+    if(P1R.available()) {
+        MyData data;
+        String error;
+
+        if(P1R.parse(&data, &error)) {
+            data.applyEach(Printer());
+        } else {
+            Serial.println(error);
+        }
+    }
+}
 
 void setup() {
-  Serial.begin(115200);
-  Serial.println("setup: begin");
-  
-  pinMode (D1, INPUT);
-  software_serial.begin(115200);
+    Serial.begin(115200);
 
-  WiFi.begin("X", "X");
-
-  while(WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println();
-
-  Serial.print("Connected, IP = ");
-  Serial.println(WiFi.localIP());
-  
-  Serial.println("setup: done");
+    setup_wifi();
+    setup_mqtt();
+    setup_software_serial();
+    setup_p1_reader();
 }
 
 void loop() {
-  yield();
-  
-  if (!mqttClient.connected()) {
-    reconnect();
-  }
-  mqttClient.loop();
-  
-  interpret_software_serial();
-}
+    loop_wifi();
+    loop_mqtt();
 
-void callback(char* topic, byte* payload, unsigned int length) {
-  Serial.println("Callback");
-  Serial.println((char) payload[0]);
-}
-
-void reconnect() {
- Serial.println("Connecting to MQTT Broker...");
- while (!mqttClient.connected()) {
-     Serial.println("Reconnecting to MQTT Broker..");
-     String clientId = "esp8266-electrical-a";
-     clientId += String(random(0xffff), HEX);
-    
-     if (mqttClient.connect(clientId.c_str())) {
-       Serial.println("Connected.");
-       // subscribe to topic      
-     }
- }
-}
-
-void interpret_software_serial() {
-  static char circle[1024] = { 0 };
-  static size_t index = 0;
-
-  static bool seen_start = false;
-  static bool seen_end = false;
-  
-  if(software_serial.available()) {
-    while(software_serial.available()) {
-      char c = software_serial.read();
-      
-      circle[index] = c;
-      index++;
-
-      if(c == '/') {
-        seen_start = true;
-      }
-      
-      if(c == '!') {
-        seen_end = true;
-      }
-
-      if(seen_start && seen_end) {
-        resilient_parse(circle);
-
-        seen_start = false;
-        seen_end = false;
-        index = 0;
-        
-        memset(circle, '\0', sizeof(circle));
-      }
-
-      if(index == 1023) {
-        seen_start = false;
-        seen_end = false;
-        
-        memset(circle, '\0', sizeof(circle));
-        index = 0;
-      }
-      
-      yield();
-    }
-  }
+    loop_p1_reader();
 }
 
 double find_electricity_consumption_high(char *circle) {
@@ -198,31 +191,31 @@ double find_gas_consumption(char *circle) {
 }
 
 void resilient_parse(char *circle) {
-  Serial.println("resilient_parse: start");
+    Serial.println("resilient_parse: start");
 
-  double electricity_consumption_high;
-  if((electricity_consumption_high = find_electricity_consumption_high(circle))) {
-    char str[128] = { 0 };
-    snprintf(str, sizeof(str), "electricity-consumption-high value=%f", electricity_consumption_high);
-    mqttClient.publish("/esp8266/electricity", str, true);
-    Serial.println(electricity_consumption_high);
-    // pass
-  }
+    double electricity_consumption_high;
+    if((electricity_consumption_high = find_electricity_consumption_high(circle))) {
+        char str[128] = { 0 };
+        snprintf(str, sizeof(str), "electricity-consumption-high,room=electrical value=%f", electricity_consumption_high);
+        mqtt.publish("/sensor/electricity-consumption-high", str, true);
+        Serial.println(electricity_consumption_high);
+        // pass
+    }
 
-  double electricity_consumption_low;
-  if((electricity_consumption_low = find_electricity_consumption_low(circle))) {
-    char str[128] = { 0 };
-    snprintf(str, sizeof(str), "electricity-consumption-low value=%f", electricity_consumption_low);
-    mqttClient.publish("/esp8266/electricity", str, true);
-    Serial.println(electricity_consumption_low);
-    // pass
-  }
+    double electricity_consumption_low;
+    if((electricity_consumption_low = find_electricity_consumption_low(circle))) {
+        char str[128] = { 0 };
+        snprintf(str, sizeof(str), "electricity-consumption-low,room=electrical value=%f", electricity_consumption_low);
+        mqtt.publish("/sensor/electricity-consumption-low", str, true);
+        Serial.println(electricity_consumption_low);
+        // pass
+    }
 
   double electricity_usage;
   if((electricity_usage = find_electricity_usage(circle))) {
     char str[128] = { 0 };
-    snprintf(str, sizeof(str), "electricity-usage value=%f", electricity_usage);
-    mqttClient.publish("/esp8266/electricity", str, true);
+    snprintf(str, sizeof(str), "electricity-usage,room=electrical value=%f", electricity_usage);
+    mqtt.publish("/sensor/electricity-usage", str, true);
     Serial.println(electricity_usage);
     // pass
   }
@@ -230,8 +223,8 @@ void resilient_parse(char *circle) {
   double gas_consumption;
   if((gas_consumption = find_gas_consumption(circle))) {
     char str[128] = { 0 };
-    snprintf(str, sizeof(str), "gas-consumption value=%f", gas_consumption);
-    mqttClient.publish("/esp8266/gas", str, true);
+    snprintf(str, sizeof(str), "gas-consumption,room=electrical value=%f", gas_consumption);
+    mqtt.publish("/sensor/gas-consumption", str, true);
     Serial.println(gas_consumption);
     // pass
   }
