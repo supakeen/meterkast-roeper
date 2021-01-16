@@ -13,7 +13,7 @@ MQTTClient mqtt;
 WiFiClient wificlient;
 
 SoftwareSerial P1S;
-P1Reader P1R(&P1S, 2);
+P1Reader P1R(&P1S, RTS_PIN);
 
 struct Printer {
   template<typename Item>
