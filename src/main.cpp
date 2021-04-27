@@ -48,11 +48,15 @@ void setup_mqtt() {
 void loop_mqtt() { mqtt.loop(); }
 
 void setup_software_serial() {
+  pinMode(RX_PIN, INPUT);
+
   P1S.begin(115200, SWSERIAL_8N1, RX_PIN, -1, true, 1024);
   P1S.setTimeout(50);
 }
 
-void setup_p1_reader() { P1R.enable(true); }
+void setup_p1_reader() {
+  P1R.enable(true);
+}
 
 void loop_p1_reader() {
   static unsigned long last_telegram;
@@ -78,8 +82,6 @@ void loop_p1_reader() {
     } else {
       Serial.println(error);
     }
-  } else {
-    Serial.println("No data available.");
   }
 }
 
