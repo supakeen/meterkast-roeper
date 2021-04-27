@@ -1,3 +1,0 @@
-[submodule "lib/arduino-dsmr"]
-	path = lib/arduino-dsmr
-	url = https://github.com/matthijskooijman/arduino-dsmr
