@@ -10,7 +10,7 @@
 #define RX_PIN RX
 
 MQTTClient mqtt;
-WiFiClient wificlient;
+WiFiClient wifi;
 
 SoftwareSerial P1S;
 P1Reader P1R(&P1S, 2);
@@ -37,9 +37,9 @@ void setup_wifi() {
 void loop_wifi() {}
 
 void setup_mqtt() {
-  static WiFiClient wificlient;
+  static WiFiClient wifi;
 
-  mqtt.begin("192.168.1.10", 1883, wificlient);
+  mqtt.begin("192.168.1.10", 1883, wifi);
 
   while (!mqtt.connect(""))
     delay(500);
@@ -69,6 +69,7 @@ void loop_p1_reader() {
   }
 
   if (P1R.available()) {
+    Serial.println("Data available.");
     MyData data;
     String error;
 
@@ -77,6 +78,8 @@ void loop_p1_reader() {
     } else {
       Serial.println(error);
     }
+  } else {
+    Serial.println("No data available.");
   }
 }
 
