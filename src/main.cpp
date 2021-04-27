@@ -12,7 +12,7 @@
 MQTTClient mqtt;
 WiFiClient wifi;
 
-SoftwareSerial P1S;
+SoftwareSerial P1S(RX_PIN, -1, true);
 P1Reader P1R(&P1S, RTS_PIN);
 
 struct Printer {
@@ -48,9 +48,7 @@ void setup_mqtt() {
 void loop_mqtt() { mqtt.loop(); }
 
 void setup_software_serial() {
-  pinMode(RX_PIN, INPUT);
-
-  P1S.begin(115200, SWSERIAL_8N1, RX_PIN, -1, true, 1024);
+  P1S.begin(115200);
   P1S.setTimeout(50);
 }
 
