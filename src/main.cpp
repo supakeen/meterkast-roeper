@@ -16,8 +16,7 @@ SoftwareSerial P1S;
 P1Reader P1R(&P1S, 2);
 
 struct Printer {
-  template<typename Item>
-  void apply(Item &i) {
+  template <typename Item> void apply(Item &i) {
     if (i.present()) {
       Serial.print(Item::name);
       Serial.print(F(": "));
@@ -29,72 +28,69 @@ struct Printer {
 };
 
 void setup_wifi() {
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-    while(WiFi.status() != WL_CONNECTED) delay(500);
+  while (WiFi.status() != WL_CONNECTED)
+    delay(500);
 }
 
-void loop_wifi() {
-}
+void loop_wifi() {}
 
 void setup_mqtt() {
-    static WiFiClient wificlient;
+  static WiFiClient wificlient;
 
-    mqtt.begin("192.168.1.10", 1883, wificlient);
+  mqtt.begin("192.168.1.10", 1883, wificlient);
 
-    while(!mqtt.connect("")) delay(500);
+  while (!mqtt.connect(""))
+    delay(500);
 }
 
-void loop_mqtt() {
-    mqtt.loop();
-}
+void loop_mqtt() { mqtt.loop(); }
 
 void setup_software_serial() {
-    P1S.begin(115200, SWSERIAL_8N1, RX_PIN, -1, true, 1024);
-    P1S.setTimeout(50);
+  P1S.begin(115200, SWSERIAL_8N1, RX_PIN, -1, true, 1024);
+  P1S.setTimeout(50);
 }
 
-void setup_p1_reader() {
-    P1R.enable(true);
-}
+void setup_p1_reader() { P1R.enable(true); }
 
 void loop_p1_reader() {
-    static unsigned long last_telegram;
-    static bool first_telegram;
+  static unsigned long last_telegram;
+  static bool first_telegram;
 
-    unsigned long now = millis();
+  unsigned long now = millis();
 
-    P1R.loop();
+  P1R.loop();
 
-    if(now - last_telegram > 15000 || first_telegram) {
-        Serial.println("Reading a new telegram.");
-        P1R.enable(true);
-        last_telegram = now;
+  if (now - last_telegram > 15000 || first_telegram) {
+    Serial.println("Reading a new telegram.");
+    P1R.enable(true);
+    last_telegram = now;
+  }
+
+  if (P1R.available()) {
+    MyData data;
+    String error;
+
+    if (P1R.parse(&data, &error)) {
+      data.applyEach(Printer());
+    } else {
+      Serial.println(error);
     }
-
-    if(P1R.available()) {
-        MyData data;
-        String error;
-
-        if(P1R.parse(&data, &error)) {
-            data.applyEach(Printer());
-        } else {
-            Serial.println(error);
-        }
-    }
+  }
 }
 
 void setup() {
-    Serial.begin(115200);
+  Serial.begin(115200);
 
-    setup_wifi();
-    setup_mqtt();
-    setup_software_serial();
-    setup_p1_reader();
+  setup_wifi();
+  setup_mqtt();
+  setup_software_serial();
+  setup_p1_reader();
 }
 
 void loop() {
-    loop_wifi();
-    loop_mqtt();
-    loop_p1_reader();
+  loop_wifi();
+  loop_mqtt();
+  loop_p1_reader();
 }
